@@ -114,3 +114,63 @@ transformer_input = token_embedding + positional_embedding
 - **Token embeddings**: 768-dimensional vector representing the word's semantic meaning
 - **Positional embeddings**: 768-dimensional vector representing where the word is in the sequence
 - The two are added together, combining both semantic and positional information
+
+---
+
+## Attention Mechanisms
+
+### Q: What is the relationship between masked attention and auto-regressive training?
+Masked attention **enforces auto-regressive properties during training**:
+
+- **Without masking**: Token at position 3 could attend to position 4's embeddings → model cheats during training by looking ahead
+- **With masking** (causal mask): Token at position 3 only attends to positions 0-3 → mirrors auto-regressive generation at inference
+
+This ensures **training matches inference behavior**. If you train with masking and generate auto-regressively, the model sees consistent attention patterns in both settings.
+
+### Q: Is masked attention always required for auto-regressive generation?
+**No, but it's required for proper auto-regressive training.**
+
+- **Auto-regressive generation**: Just sampling one token at a time (no masking needed)
+- **Auto-regressive training**: Requires causal masking to prevent information leakage
+
+Without masking during training, the model learns to rely on future tokens, which breaks at inference when you can only feed past tokens.
+
+### Q: What are the different masking strategies in Transformers?
+
+**1. Causal Masking (GPT-style decoders):**
+```
+[1 0 0 0]  ← position 0 sees only itself
+[1 1 0 0]  ← position 1 sees 0, 1
+[1 1 1 0]  ← position 2 sees 0, 1, 2
+[1 1 1 1]  ← position 3 sees all past
+```
+Enforces auto-regressive generation (left-to-right)
+
+**2. No Masking (BERT-style encoders):**
+```
+[1 1 1 1]  ← all positions attend to all
+[1 1 1 1]
+[1 1 1 1]
+[1 1 1 1]
+```
+Bidirectional context, not auto-regressive
+
+**3. Prefix Masking (Hybrid):**
+```
+[1 0 0 0 0]  ← prefix can only look at itself
+[1 1 0 0 0]  ← prefix can look at earlier prefix
+[1 1 0 0 0]  ← generation starts, sees whole prefix
+[1 1 0 1 0]  ← can see prefix + current, not future
+[1 1 0 1 1]
+```
+Bidirectional prefix + auto-regressive generation
+
+### Q: Can you have auto-regressive generation without masked attention?
+**Technically yes, but it's inefficient.**
+
+You could train without masking and the model would eventually learn auto-regressive behavior (generating one token at a time). However:
+- It's wasteful—the model wastes capacity learning NOT to use future tokens
+- **Training-inference mismatch**: Model trained to see all tokens but generates with only past tokens
+- Worse performance compared to masked training
+
+**Best practice**: Use causal masking during training for auto-regressive models (GPT-style).
