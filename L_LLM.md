@@ -174,3 +174,116 @@ You could train without masking and the model would eventually learn auto-regres
 - Worse performance compared to masked training
 
 **Best practice**: Use causal masking during training for auto-regressive models (GPT-style).
+
+---
+
+## Transformer Architecture Families
+
+### Q: What are the three main transformer architecture families and when should you use each?
+
+**1. Encoder-Decoder (e.g. "Attention is All You Need", BART, T5, Whisper):**
+- Encoder: bidirectional self-attention + FFN — fully processes the source sequence
+- Decoder: masked self-attention + cross-attention + FFN — generates the target sequence
+- Use when: input and target are **sufficiently different** (different modalities or languages)
+- Examples: translation (FR→EN), summarization, speech recognition (audio→text)
+
+**2. Encoder-Only (e.g. BERT, RoBERTa):**
+- Bidirectional self-attention + FFN, no causal mask
+- Sees the full sequence in both directions
+- Use when: you need to **understand** text, not generate it
+- Examples: classification, sequence tagging, sentiment analysis, embeddings
+
+**3. Decoder-Only (e.g. GPT, LLaMA, Claude):**
+- Masked self-attention + FFN, causal mask enforces left-to-right generation
+- No cross-attention (no separate encoder)
+- Use when: open-ended **text generation** or multi-round conversation
+- Examples: chatbots, code generation, instruction following
+
+---
+
+## Cross-Attention
+
+### Q: What is cross-attention and how does it differ from self-attention?
+
+**Self-attention**: Q, K, V all come from the **same** sequence — the sequence attends to itself.
+
+**Cross-attention**: Q comes from one sequence, K and V come from a **different** sequence — one sequence attends to another.
+
+```
+Q = decoder_state · W_Q
+K = encoder_output · W_K
+V = encoder_output · W_V
+
+Attention(Q, K, V) = softmax(QK^T / √d_k) · V
+```
+
+### Q: Where is cross-attention used in the original transformer?
+
+In the **decoder block**, as the second sub-layer (between masked self-attention and FFN):
+
+```
+Decoder block:
+1. Masked Self-Attention   ← attends to previous decoder outputs
+2. Cross-Attention         ← Q from decoder, K/V from encoder output
+3. Feed-Forward
+```
+
+It is the **information bridge** between encoder and decoder — allows the decoder to "read" the encoded source at every generation step.
+
+### Q: Which model families use cross-attention?
+
+| Model type | Cross-attention? |
+|---|---|
+| Encoder-only (BERT) | No |
+| Decoder-only (GPT, LLaMA) | No |
+| Encoder-decoder (T5, BART, Whisper) | Yes |
+| Diffusion models with text conditioning | Yes — image features attend to text embeddings |
+| Vision-language models (Flamingo) | Yes — language model attends to image features |
+
+---
+
+## LLM Architecture Clarification
+
+### Q: Is an LLM a decoder, or an encoder with causal masking?
+
+The standard term is **decoder-only**, but architecturally it is more precise to say: **encoder-style blocks (self-attention + FFN) with causal masking**.
+
+- The block structure (self-attention + FFN) matches the **encoder** from the original transformer
+- The causal mask is borrowed from the **decoder's** masked self-attention
+- There is **no cross-attention** — unlike the full original decoder block
+
+The name "decoder-only" refers to the *role* (autoregressive generation), not a strict copy of the original decoder block. It is a historical artifact.
+
+### Q: Why is the decoder-only naming potentially misleading?
+
+The original transformer decoder has three sub-layers:
+1. Masked self-attention
+2. **Cross-attention** ← this is what defines the "full" decoder
+3. Feed-forward
+
+Decoder-only LLMs drop cross-attention entirely (no encoder to attend to). What remains structurally resembles an encoder block with a causal mask — hence the user's valid intuition that an LLM is "an encoder with masked autoregressive architecture."
+
+---
+
+## Translation: Architecture Choices
+
+### Q: Do state-of-the-art translation models still use encoder-decoder?
+
+**It depends on the use case:**
+
+| Scenario | Architecture |
+|---|---|
+| Dedicated translation systems (e.g. Meta NLLB-200, DeepL) | Encoder-decoder |
+| Low-resource / rare language pairs | Encoder-decoder still wins |
+| High-resource pairs (EN↔FR, EN↔ES) | Large decoder-only LLMs are competitive |
+| General-purpose assistants that also translate | Decoder-only via prompting |
+
+The encoder-decoder advantage: bidirectional source encoding gives the model full context of the source before generating any target tokens — natural fit for languages where word order differs significantly.
+
+### Q: Why is encoder-decoder a natural fit for speech recognition (ASR)?
+
+ASR maps **audio → text** — two very different modalities. This maps cleanly onto the encode/decode split:
+- **Encoder**: processes the audio spectrogram (visual frequency representation of sound)
+- **Decoder**: autoregressively generates the text transcript
+
+Whisper (OpenAI) uses exactly this architecture. Apps like Wispr Flow run on top of Whisper-style encoder-decoder models.
