@@ -1,0 +1,1 @@
+Les factures sont émises le 1er de chaque mois et disponibles dans votre espace client sous l'onglet "Facturation". Le paiement est prélevé automatiquement 5 jours après émission de la facture. En cas d'échec de prélèvement, un email de relance est envoyé automatiquement.
